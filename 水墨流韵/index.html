@@ -64,6 +64,19 @@
     font-size:14px;letter-spacing:.52em;color:rgba(28,28,34,.34);
   }
 
+  /* ── 商务合作 ── */
+  .contact{
+    position:fixed;left:26px;bottom:92px;z-index:6;cursor:pointer;
+    font-size:11px;letter-spacing:.16em;color:rgba(28,28,34,.4);
+    transition:color .25s ease;user-select:none;
+  }
+  .contact:hover{color:rgba(28,28,34,.66)}
+  .contact b{font-weight:500;letter-spacing:.06em}
+  .contact .copied{color:var(--zhu)}
+  @media (max-width:640px){
+    .contact{left:auto;right:16px;top:22px;bottom:auto;font-size:10px;letter-spacing:.1em}
+  }
+
   /* ── 提示 ── */
   .hint{
     position:fixed;left:50%;top:46%;transform:translate(-50%,-50%);
@@ -269,6 +282,8 @@
   <span>坐看云起时</span>
   <span>行到水穷处</span>
 </div>
+
+<div class="contact" id="contact" title="点击复制微信号">商务合作 · 微信 <b>dontcrybabyy</b></div>
 
 <div class="hint" id="hint">指 尖 轻 划 &nbsp; 墨 随 水 流</div>
 
@@ -1481,6 +1496,17 @@ document.getElementById('fanEngrave').addEventListener('click', () => engrave(fa
 document.getElementById('matEngrave').addEventListener('click', () => engrave(matCanvas, mctx, matSnap, MAT_LAYOUT, matCap));
 document.getElementById('fanErase').addEventListener('click', () => eraseEngrave(fanCanvas, fctx, fanSnap, fanCap, FAN_CAP));
 document.getElementById('matErase').addEventListener('click', () => eraseEngrave(matCanvas, mctx, matSnap, matCap, MAT_CAP));
+
+/* ── 商务合作：点击复制微信号 ── */
+const contactEl = document.getElementById('contact');
+const CONTACT_HTML = '商务合作 · 微信 <b>dontcrybabyy</b>';
+contactEl.addEventListener('click', () => {
+  navigator.clipboard?.writeText('dontcrybabyy').then(() => {
+    contactEl.innerHTML = '<span class="copied">微信号已复制 ✓</span>';
+    clearTimeout(contactEl._t);
+    contactEl._t = setTimeout(() => { contactEl.innerHTML = CONTACT_HTML; }, 1600);
+  }).catch(() => {});
+});
 
 const autoBtn = document.getElementById('autoBtn');
 autoBtn.setAttribute('aria-pressed', String(autoOn));
