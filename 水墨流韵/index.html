@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>水墨流韵 — 水拓丹青</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Ma+Shan+Zheng&family=Zhi+Mang+Xing&display=swap" rel="stylesheet">
 <style>
   :root{
     --xuan:#f2ecdf;            /* 宣纸 */
@@ -45,14 +45,16 @@
   .seal{
     position:fixed;left:30px;top:calc(28px + clamp(190px,30vh,300px));z-index:5;
     pointer-events:none;
-    width:34px;height:34px;border-radius:5px;
-    background:linear-gradient(135deg,#c0392b,#9d2b20);
-    color:#f6efe2;display:flex;align-items:center;justify-content:center;
+    width:36px;height:36px;border-radius:2px;
+    background:radial-gradient(125% 125% at 32% 26%, #c63c2c, #99291d);
+    color:#f3ead9;display:flex;align-items:center;justify-content:center;
     writing-mode:vertical-rl;font-family:"Ma Shan Zheng",serif;
-    font-size:14px;letter-spacing:.1em;line-height:1;
-    transform:rotate(-3deg);
-    box-shadow:0 1px 4px rgba(157,43,32,.35);
-    opacity:.92;
+    font-size:15px;letter-spacing:.06em;line-height:1;
+    transform:rotate(-2.5deg);
+    box-shadow:
+      inset 0 0 0 1.5px rgba(243,234,217,.82),
+      0 1px 5px rgba(120,30,20,.4);
+    opacity:.93;
   }
 
   /* ── 右侧题诗 ── */
@@ -294,6 +296,8 @@
     <canvas id="fanCanvas" width="1600" height="1080"></canvas>
     <div class="fanCaption">漆 扇 既 成 · 一 扇 一 世 界</div>
     <div class="fanActs">
+      <button class="act" id="fanEngrave">刻字</button>
+      <button class="act" id="fanErase">拭字</button>
       <button class="act" id="fanSave">保存此扇</button>
       <button class="act" id="fanClose">收起</button>
     </div>
@@ -326,6 +330,8 @@
     <canvas id="matCanvas" width="1800" height="800"></canvas>
     <div class="matCaption">水 墨 成 垫 · 一 案 一 山 水</div>
     <div class="matActs">
+      <button class="act" id="matEngrave">刻字</button>
+      <button class="act" id="matErase">拭字</button>
       <button class="act" id="matSave">保存此垫</button>
       <button class="act" id="matClose">收起</button>
     </div>
@@ -887,6 +893,52 @@ const fanOverlay = document.getElementById('fanOverlay');
 const fanCanvas  = document.getElementById('fanCanvas');
 const fctx = fanCanvas.getContext('2d');
 
+// 朱砂印章（白文：朱泥为底，字与边框留白；带内框与风蚀碎边）
+function drawSeal(ctx, cx, cy, s, rot, chars){
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(rot || 0);
+  // 朱泥底（略不匀的渐变）
+  const g = ctx.createLinearGradient(-s/2, -s/2, s/2, s/2);
+  g.addColorStop(0,   '#c23a2a');
+  g.addColorStop(0.5, '#aa2f22');
+  g.addColorStop(1,   '#962a1e');
+  ctx.fillStyle = g;
+  ctx.fillRect(-s/2, -s/2, s, s);
+  // 内框（留白细线）
+  ctx.strokeStyle = '#f4ecdc';
+  ctx.lineWidth = Math.max(1.3, s * 0.05);
+  const ins = s * 0.13;
+  ctx.strokeRect(-s/2 + ins, -s/2 + ins, s - 2*ins, s - 2*ins);
+  // 字（留白）
+  ctx.fillStyle = '#f4ecdc';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const n = chars.length;
+  ctx.font = `${Math.round(n > 1 ? s * 0.40 : s * 0.6)}px "Ma Shan Zheng","Noto Serif SC",serif`;
+  if (n === 1){
+    ctx.fillText(chars[0], 0, s * 0.02);
+  } else {
+    const step = (s - 2*ins) * 0.46;
+    ctx.fillText(chars[0], 0, -step * 0.5);
+    ctx.fillText(chars[1], 0,  step * 0.5);
+  }
+  // 风蚀斑驳：随机镂去小点，越近边缘越密，碎边如刻
+  ctx.globalCompositeOperation = 'destination-out';
+  const dots = Math.round(s * 1.5);
+  for (let i = 0; i < dots; i++){
+    const ex = (Math.random() - 0.5) * s;
+    const ey = (Math.random() - 0.5) * s;
+    const edge = Math.max(Math.abs(ex), Math.abs(ey)) / (s / 2);
+    if (Math.random() < 0.12 + edge * edge * 0.55){
+      ctx.beginPath();
+      ctx.arc(ex, ey, Math.random() * s * 0.028 + 0.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 function drawFan(){
   const W = fanCanvas.width, H = fanCanvas.height;
   const cx = W / 2, cy = H * 0.86;          // 扇轴（扇钉位置）
@@ -955,20 +1007,7 @@ function drawFan(){
   // 扇面落印
   const sx = cx + Math.cos(a1 - 0.09) * R * 0.82;
   const sy = cy + Math.sin(a1 - 0.09) * R * 0.82;
-  fctx.save();
-  fctx.translate(sx, sy);
-  fctx.rotate(-0.06);
-  fctx.fillStyle = 'rgba(157,43,32,.92)';
-  const s = 44;
-  fctx.beginPath();
-  if (fctx.roundRect) fctx.roundRect(-s/2, -s/2, s, s, 7); else fctx.rect(-s/2, -s/2, s, s);
-  fctx.fill();
-  fctx.fillStyle = '#f6efe2';
-  fctx.font = '19px "Ma Shan Zheng", serif';
-  fctx.textAlign = 'center';
-  fctx.fillText('墨', 0, -2);
-  fctx.fillText('韵', 0, 17);
-  fctx.restore();
+  drawSeal(fctx, sx, sy, 46, -0.06, ['墨', '韵']);
 }
 
 document.getElementById('fanBtn').addEventListener('click', () => {
@@ -980,6 +1019,8 @@ document.getElementById('fanBtn').addEventListener('click', () => {
   }
   render();              // 刷新帧缓冲为最新画面后立即拓印
   drawFan();
+  snapshot(fanCanvas, fanSnap);   // 留一份无字底稿，供刻字重绘
+  fanCap.textContent = FAN_CAP;
   fanOverlay.hidden = false;
   requestAnimationFrame(() => fanOverlay.classList.add('show'));
   dismissHint();
@@ -1048,18 +1089,7 @@ function drawMat(wmm, hmm){
   // 角落朱印「墨韵」
   const s = Math.round(Math.min(W, H) * 0.12);
   const m = pad + s * 0.55;
-  mctx.save();
-  mctx.translate(W - m, H - m);
-  mctx.rotate(-0.05);
-  mctx.fillStyle = 'rgba(157,43,32,.92)';
-  rect(-s / 2, -s / 2, s, s, s * 0.16);
-  mctx.fill();
-  mctx.fillStyle = '#f6efe2';
-  mctx.font = `${Math.round(s * 0.4)}px "Ma Shan Zheng", serif`;
-  mctx.textAlign = 'center';
-  mctx.fillText('墨', 0, -s * 0.05);
-  mctx.fillText('韵', 0, s * 0.34);
-  mctx.restore();
+  drawSeal(mctx, W - m, H - m, s, -0.05, ['墨', '韵']);
 }
 
 document.getElementById('matBtn').addEventListener('click', () => {
@@ -1081,6 +1111,8 @@ document.getElementById('sizes').addEventListener('click', e => {
   }
   render();
   drawMat(+btn.dataset.w, +btn.dataset.h);
+  snapshot(matCanvas, matSnap);   // 留一份无字底稿，供刻字重绘
+  matCap.textContent = MAT_CAP;
   matCanvas.dataset.label = btn.dataset.w + '×' + btn.dataset.h;
   matPicker.hidden = true;
   matWrap.hidden = false;
@@ -1301,6 +1333,154 @@ function closePat(){
   patOverlay.classList.remove('show');
   setTimeout(() => { patOverlay.hidden = true; }, 600);
 }
+
+/* ════════ 刻字：题诗钤印 ════════ */
+// 历代名家古诗词（公有领域），每联取同一首中连续两句，偏重水墨山水意境
+const POEMS = [
+  { a:'床前明月光', b:'疑是地上霜', src:'李白《静夜思》' },
+  { a:'举头望明月', b:'低头思故乡', src:'李白《静夜思》' },
+  { a:'白日依山尽', b:'黄河入海流', src:'王之涣《登鹳雀楼》' },
+  { a:'欲穷千里目', b:'更上一层楼', src:'王之涣《登鹳雀楼》' },
+  { a:'千山鸟飞绝', b:'万径人踪灭', src:'柳宗元《江雪》' },
+  { a:'孤舟蓑笠翁', b:'独钓寒江雪', src:'柳宗元《江雪》' },
+  { a:'空山不见人', b:'但闻人语响', src:'王维《鹿柴》' },
+  { a:'深林人不知', b:'明月来相照', src:'王维《竹里馆》' },
+  { a:'红豆生南国', b:'春来发几枝', src:'王维《相思》' },
+  { a:'明月松间照', b:'清泉石上流', src:'王维《山居秋暝》' },
+  { a:'劝君更尽一杯酒', b:'西出阳关无故人', src:'王维《送元二使安西》' },
+  { a:'独在异乡为异客', b:'每逢佳节倍思亲', src:'王维《九月九日忆山东兄弟》' },
+  { a:'春眠不觉晓', b:'处处闻啼鸟', src:'孟浩然《春晓》' },
+  { a:'夜来风雨声', b:'花落知多少', src:'孟浩然《春晓》' },
+  { a:'飞流直下三千尺', b:'疑是银河落九天', src:'李白《望庐山瀑布》' },
+  { a:'两岸猿声啼不住', b:'轻舟已过万重山', src:'李白《早发白帝城》' },
+  { a:'孤帆远影碧空尽', b:'唯见长江天际流', src:'李白《黄鹤楼送孟浩然之广陵》' },
+  { a:'桃花潭水深千尺', b:'不及汪伦送我情', src:'李白《赠汪伦》' },
+  { a:'两岸青山相对出', b:'孤帆一片日边来', src:'李白《望天门山》' },
+  { a:'相看两不厌', b:'只有敬亭山', src:'李白《独坐敬亭山》' },
+  { a:'随风潜入夜', b:'润物细无声', src:'杜甫《春夜喜雨》' },
+  { a:'两个黄鹂鸣翠柳', b:'一行白鹭上青天', src:'杜甫《绝句》' },
+  { a:'窗含西岭千秋雪', b:'门泊东吴万里船', src:'杜甫《绝句》' },
+  { a:'会当凌绝顶', b:'一览众山小', src:'杜甫《望岳》' },
+  { a:'国破山河在', b:'城春草木深', src:'杜甫《春望》' },
+  { a:'水光潋滟晴方好', b:'山色空蒙雨亦奇', src:'苏轼《饮湖上初晴后雨》' },
+  { a:'欲把西湖比西子', b:'淡妆浓抹总相宜', src:'苏轼《饮湖上初晴后雨》' },
+  { a:'横看成岭侧成峰', b:'远近高低各不同', src:'苏轼《题西林壁》' },
+  { a:'不识庐山真面目', b:'只缘身在此山中', src:'苏轼《题西林壁》' },
+  { a:'竹外桃花三两枝', b:'春江水暖鸭先知', src:'苏轼《惠崇春江晚景》' },
+  { a:'接天莲叶无穷碧', b:'映日荷花别样红', src:'杨万里《晓出净慈寺送林子方》' },
+  { a:'小荷才露尖尖角', b:'早有蜻蜓立上头', src:'杨万里《小池》' },
+  { a:'采菊东篱下', b:'悠然见南山', src:'陶渊明《饮酒》' },
+  { a:'离离原上草', b:'一岁一枯荣', src:'白居易《赋得古原草送别》' },
+  { a:'野火烧不尽', b:'春风吹又生', src:'白居易《赋得古原草送别》' },
+  { a:'一道残阳铺水中', b:'半江瑟瑟半江红', src:'白居易《暮江吟》' },
+  { a:'月落乌啼霜满天', b:'江枫渔火对愁眠', src:'张继《枫桥夜泊》' },
+  { a:'姑苏城外寒山寺', b:'夜半钟声到客船', src:'张继《枫桥夜泊》' },
+  { a:'黄河远上白云间', b:'一片孤城万仞山', src:'王之涣《凉州词》' },
+  { a:'葡萄美酒夜光杯', b:'欲饮琵琶马上催', src:'王翰《凉州词》' },
+  { a:'秦时明月汉时关', b:'万里长征人未还', src:'王昌龄《出塞》' },
+  { a:'洛阳亲友如相问', b:'一片冰心在玉壶', src:'王昌龄《芙蓉楼送辛渐》' },
+  { a:'夕阳无限好', b:'只是近黄昏', src:'李商隐《乐游原》' },
+  { a:'春蚕到死丝方尽', b:'蜡炬成灰泪始干', src:'李商隐《无题》' },
+  { a:'君问归期未有期', b:'巴山夜雨涨秋池', src:'李商隐《夜雨寄北》' },
+  { a:'碧玉妆成一树高', b:'万条垂下绿丝绦', src:'贺知章《咏柳》' },
+  { a:'不知细叶谁裁出', b:'二月春风似剪刀', src:'贺知章《咏柳》' },
+  { a:'远上寒山石径斜', b:'白云生处有人家', src:'杜牧《山行》' },
+  { a:'停车坐爱枫林晚', b:'霜叶红于二月花', src:'杜牧《山行》' },
+  { a:'清明时节雨纷纷', b:'路上行人欲断魂', src:'杜牧《清明》' },
+  { a:'咬定青山不放松', b:'立根原在破岩中', src:'郑燮《竹石》' },
+  { a:'落红不是无情物', b:'化作春泥更护花', src:'龚自珍《己亥杂诗》' },
+];
+
+const MAT_CAP = '水 墨 成 垫 · 一 案 一 山 水';
+const FAN_CAP = '漆 扇 既 成 · 一 扇 一 世 界';
+const matCap = document.querySelector('.matCaption');
+const fanCap = document.querySelector('.fanCaption');
+
+// 成品无字底稿（供刻字时反复重绘，避免叠字）
+const matSnap = document.createElement('canvas');
+const fanSnap = document.createElement('canvas');
+function snapshot(src, snap){
+  snap.width = src.width; snap.height = src.height;
+  snap.getContext('2d').drawImage(src, 0, 0);
+}
+
+// 题诗位置：竖排右起，避开右下印章
+const MAT_LAYOUT = { colRightFrac: 0.205, bandTopFrac: 0.13, bandBotFrac: 0.88 };
+const FAN_LAYOUT = { colRightFrac: 0.545, bandTopFrac: 0.17, bandBotFrac: 0.60 };
+
+let engraveRAF = 0;
+function engrave(canvasEl, ctx, snapCanvas, layout, capEl){
+  if (!snapCanvas.width) return;
+  const p = POEMS[(Math.random() * POEMS.length) | 0];
+  if (capEl) capEl.textContent = p.src;
+  cancelAnimationFrame(engraveRAF);
+
+  const W = canvasEl.width, H = canvasEl.height;
+  const lines = [p.a, p.b];                       // 上句（右列）、下句（左列）
+  const maxLen = Math.max(p.a.length, p.b.length);
+  const bandTop = H * layout.bandTopFrac, bandBot = H * layout.bandBotFrac;
+  const fs = Math.min(H * 0.085, (bandBot - bandTop) / maxLen / 1.16);
+  const lineGap = fs * 1.16, colGap = fs * 1.46;
+  const xR = W * layout.colRightFrac, topY = bandTop + fs * 0.7;
+
+  const chars = [];
+  lines.forEach((ln, col) => {
+    const cx = xR - col * colGap;
+    for (let i = 0; i < ln.length; i++)
+      chars.push({ ch: ln[i], x: cx, y: topY + i * lineGap, delay: (col * ln.length + i) * 68, seed: col * 7 + i });
+  });
+
+  const dur = 660, t0 = performance.now();
+  function drawChar(c, e){
+    const dy = (1 - e) * (-H * 0.18);
+    const jx = (1 - e) * Math.sin(c.seed * 2.3) * fs * 0.5;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, e * 1.5);
+    ctx.shadowColor = 'rgba(242,236,223,.85)';
+    ctx.shadowBlur = fs * 0.4;
+    ctx.fillStyle = 'rgba(24,24,30,.93)';
+    ctx.font = `${fs}px "Zhi Mang Xing","Ma Shan Zheng","Noto Serif SC",serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.translate(c.x + jx, c.y + dy);
+    ctx.rotate((1 - e) * 0.6 * (c.seed % 2 ? 1 : -1));
+    ctx.fillText(c.ch, 0, 0);
+    ctx.restore();
+  }
+  function frame(now){
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(snapCanvas, 0, 0);
+    let done = true;
+    for (const c of chars){
+      const t = (now - t0 - c.delay) / dur;
+      if (t <= 0){ done = false; continue; }
+      if (t < 1) done = false;
+      drawChar(c, t >= 1 ? 1 : 1 - Math.pow(1 - t, 3));
+    }
+    if (!done){ engraveRAF = requestAnimationFrame(frame); return; }
+    ctx.clearRect(0, 0, W, H);          // 定稿：稳定重绘一次
+    ctx.drawImage(snapCanvas, 0, 0);
+    for (const c of chars) drawChar(c, 1);
+    // 款印：诗末左下钤一方小印，诗印相成
+    const sealX = xR - colGap, sealY = topY + (lines[1].length - 1) * lineGap + lineGap * 1.0;
+    drawSeal(ctx, sealX, sealY, fs * 0.95, -0.04, ['墨']);
+  }
+  engraveRAF = requestAnimationFrame(frame);
+}
+
+// 拭字：中止动画，以无字底稿还原成品，重置出处
+function eraseEngrave(canvasEl, ctx, snapCanvas, capEl, defCap){
+  cancelAnimationFrame(engraveRAF);
+  if (snapCanvas.width){
+    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+    ctx.drawImage(snapCanvas, 0, 0);
+  }
+  if (capEl) capEl.textContent = defCap;
+}
+
+document.getElementById('fanEngrave').addEventListener('click', () => engrave(fanCanvas, fctx, fanSnap, FAN_LAYOUT, fanCap));
+document.getElementById('matEngrave').addEventListener('click', () => engrave(matCanvas, mctx, matSnap, MAT_LAYOUT, matCap));
+document.getElementById('fanErase').addEventListener('click', () => eraseEngrave(fanCanvas, fctx, fanSnap, fanCap, FAN_CAP));
+document.getElementById('matErase').addEventListener('click', () => eraseEngrave(matCanvas, mctx, matSnap, matCap, MAT_CAP));
 
 const autoBtn = document.getElementById('autoBtn');
 autoBtn.setAttribute('aria-pressed', String(autoOn));
